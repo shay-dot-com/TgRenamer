@@ -8,6 +8,8 @@ from utils.metadata import get_video_info
 from utils.ffmpeg import process_video, generate_thumbnail
 from utils.caption import generate_caption
 from utils.progress import progress_for_pyrogram
+from utils.state import CANCEL_TASKS
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import time
 
 logger = logging.getLogger(__name__)
@@ -43,12 +45,30 @@ async def process_item(item):
         original_name = getattr(file, "file_name", "Unknown_File.mp4")
         original_size = getattr(file, "file_size", 0)
         
+        # Setup Cancel Button
+        cancel_markup = InlineKeyboardMarkup([[
+            InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{str(doc_id)}")
+        ]])
+        
+        # Status Message Handling (Crash Recovery vs New Job)
+        saved_msg_id = item.get("status_msg_id")
+        status_msg = None
+        if saved_msg_id:
+            try:
+                status_msg = await bot.get_messages(chat_id, saved_msg_id)
+                await status_msg.edit_text(f"📥 Resuming Download: `{original_name}`", reply_markup=cancel_markup)
+            except:
+                status_msg = None
+                
+        if not status_msg:
+            status_msg = await bot.send_message(chat_id, f"📥 Downloading: `{original_name}`", reply_markup=cancel_markup)
+            await db.save_status_message(doc_id, status_msg.id)
+        
         # 1. Generate new name
         new_name = generate_new_name(original_name)
         
         # 2. Download
         logger.info(f"Downloading: {original_name}")
-        status_msg = await bot.send_message(chat_id, f"📥 Downloading: `{original_name}`")
         
         input_path = os.path.join(DOWNLOAD_DIR, f"in_{message_id}_{original_name}")
         output_path = os.path.join(DOWNLOAD_DIR, new_name)
@@ -58,21 +78,24 @@ async def process_item(item):
             message,
             file_name=input_path,
             progress=progress_for_pyrogram,
-            progress_args=(f"📥 **Downloading:** `{original_name}`", status_msg, start_time)
+            progress_args=(f"📥 **Downloading:** `{original_name}`", status_msg, start_time, str(doc_id), cancel_markup)
         )
         
         # 3. Extract Metadata
-        await status_msg.edit_text("⚙️ Processing Metadata...")
+        if CANCEL_TASKS.get(str(doc_id)): raise asyncio.CancelledError()
+        await status_msg.edit_text("⚙️ Processing Metadata...", reply_markup=cancel_markup)
         info = await get_video_info(input_path)
         
         # 4. Process via FFmpeg
-        await status_msg.edit_text("🔨 Running FFmpeg...")
+        if CANCEL_TASKS.get(str(doc_id)): raise asyncio.CancelledError()
+        await status_msg.edit_text("🔨 Running FFmpeg...", reply_markup=cancel_markup)
         success = await process_video(input_path, output_path, new_name)
         
         if not success:
             raise Exception("FFmpeg processing failed")
             
         # 4.5. Thumbnail Generation/Download
+        if CANCEL_TASKS.get(str(doc_id)): raise asyncio.CancelledError()
         thumb_path = None
         custom_thumb_id = await db.get_thumbnail(chat_id)
         
@@ -97,7 +120,8 @@ async def process_item(item):
         caption = generate_caption(new_name, info, original_size)
         
         # 6. Upload
-        await status_msg.edit_text("📤 Uploading...")
+        if CANCEL_TASKS.get(str(doc_id)): raise asyncio.CancelledError()
+        await status_msg.edit_text("📤 Uploading...", reply_markup=cancel_markup)
         
         upload_start_time = time.time()
         await client.send_document(
@@ -107,7 +131,7 @@ async def process_item(item):
             caption=caption,
             file_name=new_name,
             progress=progress_for_pyrogram,
-            progress_args=(f"📤 **Uploading:** `{new_name}`", status_msg, upload_start_time)
+            progress_args=(f"📤 **Uploading:** `{new_name}`", status_msg, upload_start_time, str(doc_id), cancel_markup)
         )
         
         # Clean up
@@ -117,12 +141,33 @@ async def process_item(item):
         
         await status_msg.delete()
         await db.update_status(doc_id, "COMPLETED")
+        
+        # Remove from state
+        if str(doc_id) in CANCEL_TASKS:
+            del CANCEL_TASKS[str(doc_id)]
+            
         logger.info(f"Successfully processed {new_name}")
         
+    except asyncio.CancelledError:
+        logger.warning(f"Process {doc_id} was cancelled by the user.")
+        await db.update_status(doc_id, "CANCELLED")
+        try:
+            if status_msg: await status_msg.edit_text("❌ Process Cancelled.")
+        except: pass
+        # Clean up temp files
+        try:
+            input_path = os.path.join(DOWNLOAD_DIR, f"in_{message_id}_{original_name}")
+            output_path = os.path.join(DOWNLOAD_DIR, getattr(message.document or message.video, 'file_name', 'Unknown.mp4'))
+            if os.path.exists(input_path): os.remove(input_path)
+            if os.path.exists(output_path): os.remove(output_path)
+        except: pass
+
     except Exception as e:
         logger.error(f"Error processing item {doc_id}: {e}")
         await db.update_status(doc_id, "FAILED")
-        await bot.send_message(chat_id, "❌ An error occurred while processing your file.")
+        try:
+            if status_msg: await status_msg.edit_text("❌ An error occurred while processing your file.")
+        except: pass
 
 async def queue_worker():
     """Background loop that continuously checks for pending items."""
@@ -133,11 +178,10 @@ async def queue_worker():
     
     while True:
         try:
-            # Fetch 1 pending item at a time
-            pending_items = await db.queue.find({"status": "PENDING"}).limit(1).to_list(length=1)
+            # Fetch 1 pending item atomically using get_next_job
+            item = await db.get_next_job()
             
-            if pending_items:
-                item = pending_items[0]
+            if item:
                 await process_item(item)
             else:
                 # Sleep briefly if queue is empty

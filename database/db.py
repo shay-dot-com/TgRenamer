@@ -1,4 +1,5 @@
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import ReturnDocument
 from config import Config
 import logging
 
@@ -20,9 +21,19 @@ class Database:
             "message_id": message_id,
             "file_id": file_id,
             "file_type": file_type,
-            "status": "PENDING", # PENDING, PROCESSING, COMPLETED, FAILED
+            "status": "PENDING", # PENDING, PROCESSING, COMPLETED, FAILED, CANCELLED
+            "status_msg_id": None
         }
         await self.queue.insert_one(doc)
+        return doc
+
+    async def get_next_job(self):
+        """Atomically fetches a PENDING item and marks it PROCESSING"""
+        doc = await self.queue.find_one_and_update(
+            {"status": "PENDING"},
+            {"$set": {"status": "PROCESSING"}},
+            return_document=ReturnDocument.AFTER
+        )
         return doc
 
     async def get_pending_files(self):
@@ -31,6 +42,9 @@ class Database:
 
     async def update_status(self, document_id, new_status):
         await self.queue.update_one({"_id": document_id}, {"$set": {"status": new_status}})
+
+    async def save_status_message(self, document_id, msg_id):
+        await self.queue.update_one({"_id": document_id}, {"$set": {"status_msg_id": msg_id}})
 
     # --- Thumbnail Logic ---
     async def set_thumbnail(self, user_id, file_id):

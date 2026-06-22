@@ -1,10 +1,16 @@
 import time
 import math
-from pyrogram.types import Message
+import asyncio
+from pyrogram.types import Message, InlineKeyboardMarkup
 from pyrogram.errors import MessageNotModified
 from utils.caption import get_readable_size, get_readable_time
+from utils.state import CANCEL_TASKS
 
-async def progress_for_pyrogram(current, total, ud_type, message: Message, start):
+async def progress_for_pyrogram(current, total, ud_type, message: Message, start, doc_id: str, reply_markup: InlineKeyboardMarkup = None):
+    # Check for cancellation
+    if CANCEL_TASKS.get(doc_id):
+        raise asyncio.CancelledError("User cancelled the process.")
+
     now = time.time()
     diff = now - start
     
@@ -36,7 +42,8 @@ async def progress_for_pyrogram(current, total, ud_type, message: Message, start
             
         try:
             await message.edit_text(
-                text=f"{ud_type}\n\n{tmp}"
+                text=f"{ud_type}\n\n{tmp}",
+                reply_markup=reply_markup
             )
         except MessageNotModified:
             pass
