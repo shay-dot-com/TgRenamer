@@ -1,0 +1,6 @@
+kurigram
+PySocks
+motor
+python-dotenv
+psutil
+cryptography
