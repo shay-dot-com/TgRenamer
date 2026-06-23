@@ -51,7 +51,24 @@ def get_resolution_bucket(width: int, height: int) -> str:
     elif pixels >= 150000: return "360p"   # Cinematic 360p is ~640x272 (174K) or 608x256 (155K)
     else: return "240p"
 
-async def get_video_info(file_path: str, original_name: str = "") -> dict:
+def extract_languages_from_caption(caption: str) -> list:
+    if not caption: return []
+    
+    audio_line = ""
+    for line in caption.split('\n'):
+        line_lower = line.lower()
+        if '🔊' in line_lower or '🗣' in line_lower or 'audio' in line_lower:
+            audio_line = line
+            break
+            
+    if audio_line:
+        # High confidence because we specifically isolated the Audio line
+        return extract_languages_from_filename(audio_line)
+    
+    # If no specific line, scan the whole caption but rely on scoring logic
+    return extract_languages_from_filename(caption)
+
+async def get_video_info(file_path: str, original_name: str = "", original_caption: str = "") -> dict:
     cmd = [
         "ffprobe",
         "-v", "error",
@@ -136,7 +153,13 @@ async def get_video_info(file_path: str, original_name: str = "") -> dict:
                 elif c_type == "subtitle":
                     info["subs_count"] += 1
                     
-            # Priority 2: Filename Language Parsing
+            # Priority 2: Original Caption Language Parsing
+            if info["audio_count"] >= 1 and not info["audio_languages"] and original_caption:
+                extracted = extract_languages_from_caption(original_caption)
+                if extracted:
+                    info["audio_languages"] = extracted
+                    
+            # Priority 3: Filename Language Parsing
             if info["audio_count"] >= 1 and not info["audio_languages"] and original_name:
                 extracted = extract_languages_from_filename(original_name)
                 info["audio_languages"] = extracted

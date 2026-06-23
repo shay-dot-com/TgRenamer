@@ -44,6 +44,7 @@ async def process_item(item):
         file = getattr(message, message.media.value)
         original_name = getattr(file, "file_name", "Unknown_File.mp4")
         original_size = getattr(file, "file_size", 0)
+        original_caption = getattr(message, "caption", "") or ""
         
         # Setup Cancel Button
         cancel_markup = InlineKeyboardMarkup([[
@@ -84,7 +85,7 @@ async def process_item(item):
         # 3. Extract Metadata
         if CANCEL_TASKS.get(str(doc_id)): raise asyncio.CancelledError()
         await status_msg.edit_text("⚙️ Processing Metadata...", reply_markup=cancel_markup)
-        info = await get_video_info(input_path, original_name)
+        info = await get_video_info(input_path, original_name, original_caption)
         
         # 4. Process via FFmpeg
         if CANCEL_TASKS.get(str(doc_id)): raise asyncio.CancelledError()
