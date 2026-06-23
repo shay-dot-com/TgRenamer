@@ -68,10 +68,19 @@ async def generate_new_name(original_name: str, info: dict = None) -> str:
             tags.append(".".join(langs))
             
         if info.get("video_codec") and info["video_codec"] != "Unknown":
-            tags.append(info["video_codec"])
+            v_codec = info["video_codec"]
+            if v_codec == "X265": v_codec = "HEVC" # Use HEVC as requested
+            tags.append(v_codec)
             
-        if info.get("video_profile") and info["video_profile"] != "8Bit":
+        # Add bit depth (including 8Bit now)
+        if info.get("video_profile"):
             tags.append(info["video_profile"])
+            
+        # Add Audio Codecs & Channels (e.g., AAC.2CH)
+        if info.get("audio_codecs"):
+            for a_codec in info["audio_codecs"]:
+                # Replace space with dot to maintain standard formatting (AAC 2CH -> AAC.2CH)
+                tags.append(a_codec.replace(" ", "."))
             
         if tags:
             tag_str = ".".join(tags)
