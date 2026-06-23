@@ -1,35 +1,66 @@
 import re
 
-def generate_new_name(original_name: str) -> str:
+def generate_new_name(original_name: str, info: dict = None) -> str:
     if not original_name:
         return "Unknown_File"
 
     name = original_name
 
-    # 1. Strip common website/channel tags like [Scraped], (t.me/Channel)
-    # Removes text inside brackets/parentheses if it contains URLs or @
-    name = re.sub(r'\[.*?\]|\(.*?\)', lambda m: '' if any(x in m.group(0).lower() for x in ['.com', '.me', '.net', '.org', 'www', 'http', '@', 't.me']) else m.group(0), name)
-    
-    # Remove Telegram links securely without eating the whole string
+    # 1. Strip leading brackets like [IMDB] or (TelegramChannel) from the VERY start of the filename
+    name = re.sub(r'^\[.*?\] *|^\(.*?\) *', '', name)
+
+    # 2. Remove Telegram links securely
     name = re.sub(r't\.me/[a-zA-Z0-9_]+', '', name, flags=re.IGNORECASE)
     name = name.replace('@', '')
+    
+    # Extract extension
     parts = name.rsplit('.', 1)
     if len(parts) > 1:
         base_name, ext = parts[0], parts[1]
     else:
         base_name, ext = name, ""
+        
+    # 3. Strip known garbage quality/codec tags so we don't duplicate them
+    garbage_tags = r'\b(2160p|1440p|1080p|720p|480p|360p|240p|x264|x265|hevc|h264|8bit|10bit|hdr|web-dl|webdl|bluray|brrip|hdrip|dvdrip|hq)\b'
+    base_name = re.sub(garbage_tags, '', base_name, flags=re.IGNORECASE)
 
-    # 3. Clean base name
-    # Replace common separators with spaces to normalize
-    base_name = re.sub(r'[_\-]', ' ', base_name)
-    
-    # Remove multiple spaces
+    # 4. Clean separators
+    base_name = re.sub(r'[_\-\[\]\(\)]', ' ', base_name)
     base_name = re.sub(r'\s+', ' ', base_name).strip()
-
-    # 4. Convert spaces to dots
+    
+    # Title Case for aesthetics
+    base_name = base_name.title()
+    
     base_name = base_name.replace(' ', '.')
+    base_name = base_name.strip('.') # Clean trailing dots
+    
+    # 5. Inject accurate dynamic metadata
+    if info:
+        tags = []
+        if info.get("resolution") and info["resolution"] != "Unknown":
+            tags.append(info["resolution"])
+            
+        # Add primary languages
+        if info.get("audio_languages"):
+            lang_map = {
+                "hin": "Hindi", "eng": "English", "tam": "Tamil", "tel": "Telugu",
+                "mal": "Malayalam", "kan": "Kannada", "spa": "Spanish", "fra": "French",
+                "jpn": "Japanese", "kor": "Korean", "chi": "Chinese", "en": "English",
+                "hi": "Hindi", "ta": "Tamil", "te": "Telugu", "ml": "Malayalam"
+            }
+            langs = [lang_map.get(l.lower(), l.title() if l.islower() else l) for l in info["audio_languages"]]
+            tags.append(".".join(langs))
+            
+        if info.get("video_codec") and info["video_codec"] != "Unknown":
+            tags.append(info["video_codec"])
+            
+        if info.get("video_profile") and info["video_profile"] != "8Bit":
+            tags.append(info["video_profile"])
+            
+        if tags:
+            tag_str = ".".join(tags)
+            base_name = f"{base_name}.{tag_str}"
 
-    # Reconstruct name
     if ext:
         return f"{base_name}.{ext}"
     return base_name

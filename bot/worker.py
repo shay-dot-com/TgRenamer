@@ -65,14 +65,10 @@ async def process_item(item):
             status_msg = await bot.send_message(chat_id, f"📥 Downloading: `{original_name}`", reply_markup=cancel_markup)
             await db.save_status_message(doc_id, status_msg.id)
         
-        # 1. Generate new name
-        new_name = generate_new_name(original_name)
-        
-        # 2. Download
+        # 1. Setup Input Path
         logger.info(f"Downloading: {original_name}")
         
         input_path = os.path.join(DOWNLOAD_DIR, f"in_{message_id}_{original_name}")
-        output_path = os.path.join(DOWNLOAD_DIR, new_name)
         
         start_time = time.time()
         await client.download_media(
@@ -82,10 +78,14 @@ async def process_item(item):
             progress_args=(f"📥 **Downloading:** `{original_name}`", status_msg, start_time, str(doc_id), cancel_markup)
         )
         
-        # 3. Extract Metadata
+        # 2. Extract Metadata
         if CANCEL_TASKS.get(str(doc_id)): raise asyncio.CancelledError()
         await status_msg.edit_text("⚙️ Processing Metadata...", reply_markup=cancel_markup)
         info = await get_video_info(input_path, original_name, original_caption)
+        
+        # 3. Generate New Dynamic Name
+        new_name = generate_new_name(original_name, info)
+        output_path = os.path.join(DOWNLOAD_DIR, new_name)
         
         # 4. Process via FFmpeg
         if CANCEL_TASKS.get(str(doc_id)): raise asyncio.CancelledError()
@@ -158,9 +158,8 @@ async def process_item(item):
         # Clean up temp files
         try:
             input_path = os.path.join(DOWNLOAD_DIR, f"in_{message_id}_{original_name}")
-            output_path = os.path.join(DOWNLOAD_DIR, getattr(message.document or message.video, 'file_name', 'Unknown.mp4'))
             if os.path.exists(input_path): os.remove(input_path)
-            if os.path.exists(output_path): os.remove(output_path)
+            if 'output_path' in locals() and os.path.exists(output_path): os.remove(output_path)
         except: pass
 
     except Exception as e:
