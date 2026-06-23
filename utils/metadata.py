@@ -73,7 +73,7 @@ async def get_video_info(file_path: str, original_name: str = "", original_capti
         "ffprobe",
         "-v", "error",
         "-show_entries", "format=duration",
-        "-show_entries", "stream=codec_type,codec_name,profile,width,height,pix_fmt,color_transfer,tags",
+        "-show_entries", "stream=codec_type,codec_name,profile,width,height,pix_fmt,color_transfer,tags,channels",
         "-of", "json",
         file_path
     ]
@@ -134,8 +134,17 @@ async def get_video_info(file_path: str, original_name: str = "", original_capti
                 elif c_type == "audio":
                     info["audio_count"] += 1
                     codec = stream.get("codec_name", "").upper()
-                    if codec and codec not in info["audio_codecs"]:
-                        info["audio_codecs"].append(codec)
+                    
+                    channels = stream.get("channels")
+                    ch_str = ""
+                    if channels == 2: ch_str = " 2CH"
+                    elif channels == 6: ch_str = " 6CH" # Usually 5.1 but 6 channels
+                    elif channels == 8: ch_str = " 8CH" # Usually 7.1
+                    elif channels: ch_str = f" {channels}CH"
+                    
+                    full_codec = f"{codec}{ch_str}".strip()
+                    if full_codec and full_codec not in info["audio_codecs"]:
+                        info["audio_codecs"].append(full_codec)
                         
                     tags = stream.get("tags", {})
                     # Priority 1: ISO language tag
