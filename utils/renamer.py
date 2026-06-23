@@ -25,13 +25,27 @@ def generate_new_name(original_name: str, info: dict = None) -> str:
     base_name = re.sub(garbage_tags, '', base_name, flags=re.IGNORECASE)
 
     # 4. Clean separators
-    base_name = re.sub(r'[_\-\[\]\(\)]', ' ', base_name)
+    base_name = re.sub(r'[_\-\[\]\(\)#]', ' ', base_name)
     base_name = re.sub(r'\s+', ' ', base_name).strip()
     
     # Title Case for aesthetics
     base_name = base_name.title()
     
+    # Restore standard acronym casing
+    acronyms = {
+        "Webrip": "WEBRip", "Web dl": "WEB-DL", "Web Dl": "WEB-DL",
+        "Web": "WEB", "Hdcam": "HDCAM", "Psa": "PSA", "Yts": "YTS",
+        "Yify": "YIFY", "Rarbg": "RARBG", "Esub": "ESub", "Msub": "MSub",
+        "Hc": "HC", "Aac": "AAC", "Eac3": "EAC3", "Ch": "CH"
+    }
+    for old, new in acronyms.items():
+        base_name = re.sub(rf'\b{old}\b', new, base_name)
+    
     base_name = base_name.replace(' ', '.')
+    
+    # Fix double dots that occur when middle tags are removed
+    base_name = re.sub(r'\.+', '.', base_name)
+    
     base_name = base_name.strip('.') # Clean trailing dots
     
     # 5. Inject accurate dynamic metadata
