@@ -6,14 +6,13 @@ def generate_new_name(original_name: str) -> str:
 
     name = original_name
 
-    # 1. Strip common website/channel tags like [Scraped], @ChannelName, etc.
-    # Removes text inside brackets/parentheses if it contains "www", "http", ".com", ".me", "@"
+    # 1. Strip common website/channel tags like [Scraped], (t.me/Channel)
+    # Removes text inside brackets/parentheses if it contains URLs or @
     name = re.sub(r'\[.*?\]|\(.*?\)', lambda m: '' if any(x in m.group(0).lower() for x in ['.com', '.me', '.net', '.org', 'www', 'http', '@', 't.me']) else m.group(0), name)
     
-    # Removes @Username tags anywhere
-    name = re.sub(r'@\w+', '', name)
-
-    # 2. Extract extension
+    # Remove Telegram links securely without eating the whole string
+    name = re.sub(r't\.me/[a-zA-Z0-9_]+', '', name, flags=re.IGNORECASE)
+    name = name.replace('@', '')
     parts = name.rsplit('.', 1)
     if len(parts) > 1:
         base_name, ext = parts[0], parts[1]
