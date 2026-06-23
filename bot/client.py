@@ -25,7 +25,9 @@ bot = Client(
     bot_token=Config.BOT_TOKEN,
     plugins=dict(root="bot.plugins"),
     workers=Config.WORKERS,
-    proxy=proxy_dict
+    proxy=proxy_dict,
+    max_concurrent_transmissions=5,
+    sleep_threshold=60
 )
 
 # Optional Premium Userbot Client (4GB limit)
@@ -37,7 +39,9 @@ if Config.STRING_SESSION:
         api_hash=Config.API_HASH,
         session_string=Config.STRING_SESSION,
         workers=Config.WORKERS,
-        proxy=proxy_dict
+        proxy=proxy_dict,
+        max_concurrent_transmissions=5,
+        sleep_threshold=60
     )
     logger.info("Premium String Session detected. 4GB Userbot upgrade is ENABLED.")
 else:
