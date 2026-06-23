@@ -71,12 +71,26 @@ def generate_caption(file_name: str, info: dict, original_size: int) -> str:
         subs_str = f"💬 **Subs:** `E-Sub`\n"
         
     # Series vs Movie
-    series_match = re.search(r'S(\d+)E(\d+)', file_name, re.IGNORECASE)
+    season = None
+    episode = None
+    
+    # Try multiple regex patterns for robust matching
+    patterns = [
+        r'S(\d+).*?E(\d+)',            # S01E04, S01 E04
+        r'(\d+)x(\d+)',                # 1x04, 01x04
+        r'Season\s*(\d+)\s*Episode\s*(\d+)' # Season 1 Episode 4
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, file_name, re.IGNORECASE)
+        if match:
+            season = match.group(1).zfill(2)
+            episode = match.group(2).zfill(2)
+            break
+            
     clean_name = file_name.replace(".", " ").replace("_", " ").rsplit(" ", 1)[0]
     
-    if series_match:
-        season = series_match.group(1)
-        episode = series_match.group(2)
+    if season and episode:
         caption = (
             f"**{clean_name}**\n\n"
             f"📺 **Season:** `{season}`\n"
