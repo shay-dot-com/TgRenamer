@@ -9,7 +9,7 @@ async def get_video_info(file_path: str) -> dict:
         "ffprobe",
         "-v", "error",
         "-show_entries", "format=duration",
-        "-show_entries", "stream=codec_type,codec_name,profile,width,height,pix_fmt,tags",
+        "-show_entries", "stream=codec_type,codec_name,profile,width,height,pix_fmt,color_transfer,tags",
         "-of", "json",
         file_path
     ]
@@ -59,7 +59,9 @@ async def get_video_info(file_path: str) -> dict:
                     
                     profile = stream.get("profile", "")
                     pix_fmt = stream.get("pix_fmt", "")
-                    if "10" in profile.lower() or "10" in pix_fmt.lower() or "hdr" in profile.lower():
+                    color_transfer = stream.get("color_transfer", "")
+                    
+                    if "10" in profile.lower() or "10" in pix_fmt.lower() or "hdr" in profile.lower() or "smpte2084" in color_transfer.lower() or "arib-std-b67" in color_transfer.lower():
                         info["video_profile"] = "10Bit"
                     elif "8" in profile.lower() or "8" in pix_fmt.lower() or profile.lower() in ["main", "high"]:
                         info["video_profile"] = "8Bit"
@@ -77,6 +79,10 @@ async def get_video_info(file_path: str) -> dict:
                         
                 elif c_type == "subtitle":
                     info["subs_count"] += 1
+                    
+            # Default to English if audio tracks exist but no language is found
+            if info["audio_count"] >= 1 and not info["audio_languages"]:
+                info["audio_languages"] = ["eng"]
                     
         return info
     except Exception as e:
