@@ -1,6 +1,7 @@
 import re
+from utils.title_extractor import extract_title_from_filename
 
-def generate_new_name(original_name: str, info: dict = None) -> str:
+async def generate_new_name(original_name: str, info: dict = None) -> str:
     if not original_name:
         return "Unknown_File"
 
@@ -20,31 +21,26 @@ def generate_new_name(original_name: str, info: dict = None) -> str:
     else:
         base_name, ext = name, ""
         
-    # 3. Strip known garbage quality/codec tags so we don't duplicate them
-    garbage_tags = r'\b(2160p|1440p|1080p|720p|480p|360p|240p|x264|x265|hevc|h264|8bit|10bit|hdr|web-dl|webdl|bluray|brrip|hdrip|dvdrip|hq)\b'
-    base_name = re.sub(garbage_tags, '', base_name, flags=re.IGNORECASE)
-
-    # 4. Clean separators
-    base_name = re.sub(r'[_\-\[\]\(\)#]', ' ', base_name)
-    base_name = re.sub(r'\s+', ' ', base_name).strip()
+    # Semantic TMDB Title Extraction
+    title_data = await extract_title_from_filename(base_name)
+    clean_title = title_data.get("title", base_name)
+    clean_year = title_data.get("year", "")
     
-    # Title Case for aesthetics
-    base_name = base_name.title()
+    # Title Case for aesthetics (unless TMDB returned official casing)
+    # Actually TMDB returns official casing! So we don't need .title() if TMDB succeeds!
+    # But just in case TMDB failed and it's a fallback:
+    if clean_title == base_name or clean_title == clean_title.lower():
+        clean_title = clean_title.title()
+        
+    # Reconstruct the base name with dots instead of spaces
+    base_name = clean_title.replace(' ', '.')
     
-    # Restore standard acronym casing
-    acronyms = {
-        "Webrip": "WEBRip", "Web dl": "WEB-DL", "Web Dl": "WEB-DL",
-        "Web": "WEB", "Hdcam": "HDCAM", "Psa": "PSA", "Yts": "YTS",
-        "Yify": "YIFY", "Rarbg": "RARBG", "Esub": "ESub", "Msub": "MSub",
-        "Hc": "HC", "Aac": "AAC", "Eac3": "EAC3", "Ch": "CH"
-    }
-    for old, new in acronyms.items():
-        base_name = re.sub(rf'\b{old}\b', new, base_name)
-    
-    base_name = base_name.replace(' ', '.')
-    
-    # Fix double dots that occur when middle tags are removed
-    base_name = re.sub(r'\.+', '.', base_name)
+    # Append the Year if it exists
+    if clean_year:
+        base_name = f"{base_name}.{clean_year}"
+    # Note: We removed the hardcoded acronyms dictionary because TMDB validation 
+    # handles acronyms perfectly (e.g., returning "Spider-Man: No Way Home").
+    # If TMDB fails, it just uses standard Title Case.
     
     base_name = base_name.strip('.') # Clean trailing dots
     

@@ -84,7 +84,7 @@ async def process_item(item):
         info = await get_video_info(input_path, original_name, original_caption)
         
         # 3. Generate New Dynamic Name
-        new_name = generate_new_name(original_name, info)
+        new_name = await generate_new_name(original_name, info)
         output_path = os.path.join(DOWNLOAD_DIR, new_name)
         
         # 4. Process via FFmpeg

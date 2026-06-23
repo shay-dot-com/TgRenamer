@@ -10,6 +10,7 @@ class Config:
     STRING_SESSION = os.environ.get("STRING_SESSION", "")
     MONGO_URI = os.environ.get("MONGO_URI", "")
     OWNER_ID = int(os.environ.get("OWNER_ID", 0))
+    TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "")
 
     # Proxy Configuration
     PROXY_IP = os.environ.get("PROXY_IP", "")
