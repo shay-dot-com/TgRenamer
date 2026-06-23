@@ -1,10 +1,15 @@
 import time
 import math
 import asyncio
+import logging
 from pyrogram.types import Message, InlineKeyboardMarkup
-from pyrogram.errors import MessageNotModified
+from pyrogram.errors import MessageNotModified, FloodWait
 from utils.caption import get_readable_size, get_readable_time
 from utils.state import CANCEL_TASKS
+
+logger = logging.getLogger(__name__)
+
+LAST_UPDATE = {}
 
 async def progress_for_pyrogram(current, total, ud_type, message: Message, start, doc_id: str, reply_markup: InlineKeyboardMarkup = None):
     # Check for cancellation
@@ -14,12 +19,19 @@ async def progress_for_pyrogram(current, total, ud_type, message: Message, start
     now = time.time()
     diff = now - start
     
-    # Update progress every 3 seconds to avoid FloodWait
-    if round(diff % 3.00) == 0 or current == total:
-        percentage = current * 100 / total
-        speed = current / diff if diff > 0 else 0
-        elapsed_time = round(diff)
-        time_to_completion = round((total - current) / speed) if speed > 0 else 0
+    # Proper timing: strictly update every 5 seconds
+    if doc_id not in LAST_UPDATE:
+        LAST_UPDATE[doc_id] = start
+
+    if (now - LAST_UPDATE[doc_id] < 5) and (current != total):
+        return
+
+    LAST_UPDATE[doc_id] = now
+    
+    percentage = current * 100 / total
+    speed = current / diff if diff > 0 else 0
+    elapsed_time = round(diff)
+    time_to_completion = round((total - current) / speed) if speed > 0 else 0
         
         estimated_total_time = elapsed_time + time_to_completion
         
@@ -47,6 +59,11 @@ async def progress_for_pyrogram(current, total, ud_type, message: Message, start
             )
         except MessageNotModified:
             pass
+        except FloodWait as e:
+            logger.warning(f"Progress bar FloodWait! Telegram wants us to wait {e.value}s.")
         except Exception as e:
-            # Ignore other edit errors like FloodWait
-            pass
+            logger.error(f"Progress callback error: {e}")
+
+        # Cleanup LAST_UPDATE if done
+        if current == total and doc_id in LAST_UPDATE:
+            del LAST_UPDATE[doc_id]
