@@ -57,7 +57,8 @@ async def process_item(item):
         if saved_msg_id:
             try:
                 status_msg = await bot.get_messages(chat_id, saved_msg_id)
-                await status_msg.edit_text(f"📥 Resuming Download: `{original_name}`", reply_markup=cancel_markup)
+                # If it's the 'Added to Queue' message, just change it to Downloading
+                await status_msg.edit_text(f"📥 Downloading: `{original_name}`", reply_markup=cancel_markup)
             except:
                 status_msg = None
                 

@@ -29,7 +29,8 @@ async def receiver(client: Client, message: Message):
             user_id=message.from_user.id,
             message_id=message.id,
             file_id=file.file_id,
-            file_type=message.media.value
+            file_type=message.media.value,
+            status_msg_id=processing_msg.id
         )
     except Exception as e:
         logger.error(f"Error adding to queue: {e}")

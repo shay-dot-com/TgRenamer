@@ -14,7 +14,7 @@ class Database:
         self.queue = self.db.queue
         self.users = self.db.users
 
-    async def add_to_queue(self, user_id, message_id, file_id, file_type):
+    async def add_to_queue(self, user_id, message_id, file_id, file_type, status_msg_id=None):
         """Adds a new file to the persistent processing queue"""
         doc = {
             "user_id": user_id,
@@ -22,7 +22,7 @@ class Database:
             "file_id": file_id,
             "file_type": file_type,
             "status": "PENDING", # PENDING, PROCESSING, COMPLETED, FAILED, CANCELLED
-            "status_msg_id": None
+            "status_msg_id": status_msg_id
         }
         await self.queue.insert_one(doc)
         return doc
