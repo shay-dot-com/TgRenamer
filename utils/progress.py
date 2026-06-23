@@ -10,6 +10,7 @@ from utils.state import CANCEL_TASKS
 logger = logging.getLogger(__name__)
 
 LAST_UPDATE = {}
+SPEED_TRACKER = {}
 
 async def progress_for_pyrogram(current, total, ud_type, message: Message, start, doc_id: str, reply_markup: InlineKeyboardMarkup = None):
     # Check for cancellation
@@ -22,14 +23,25 @@ async def progress_for_pyrogram(current, total, ud_type, message: Message, start
     # Proper timing: strictly update every 5 seconds
     if doc_id not in LAST_UPDATE:
         LAST_UPDATE[doc_id] = start
+        SPEED_TRACKER[doc_id] = {"time": start, "bytes": 0}
 
     if (now - LAST_UPDATE[doc_id] < 5) and (current != total):
         return
-
+        
+    # Calculate instantaneous speed over the last interval (5 seconds)
+    last_time = SPEED_TRACKER[doc_id]["time"]
+    last_bytes = SPEED_TRACKER[doc_id]["bytes"]
+    
+    window_diff = now - last_time
+    bytes_diff = current - last_bytes
+    
+    speed = bytes_diff / window_diff if window_diff > 0 else 0
+    
+    # Update trackers
     LAST_UPDATE[doc_id] = now
+    SPEED_TRACKER[doc_id] = {"time": now, "bytes": current}
     
     percentage = current * 100 / total
-    speed = current / diff if diff > 0 else 0
     elapsed_time = round(diff)
     time_to_completion = round((total - current) / speed) if speed > 0 else 0
         
@@ -65,5 +77,6 @@ async def progress_for_pyrogram(current, total, ud_type, message: Message, start
         logger.error(f"Progress callback error: {e}")
 
     # Cleanup LAST_UPDATE if done
-    if current == total and doc_id in LAST_UPDATE:
-        del LAST_UPDATE[doc_id]
+    if current == total:
+        if doc_id in LAST_UPDATE: del LAST_UPDATE[doc_id]
+        if doc_id in SPEED_TRACKER: del SPEED_TRACKER[doc_id]
