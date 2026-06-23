@@ -47,7 +47,10 @@ class Database:
         return pending, processing
 
     async def update_status(self, document_id, new_status):
-        await self.queue.update_one({"_id": document_id}, {"$set": {"status": new_status}})
+        if new_status in ["COMPLETED", "FAILED", "CANCELLED"]:
+            await self.queue.delete_one({"_id": document_id})
+        else:
+            await self.queue.update_one({"_id": document_id}, {"$set": {"status": new_status}})
 
     async def save_status_message(self, document_id, msg_id):
         await self.queue.update_one({"_id": document_id}, {"$set": {"status_msg_id": msg_id}})

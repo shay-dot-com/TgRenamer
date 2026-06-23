@@ -77,6 +77,26 @@ def generate_windows(tokens: list) -> list:
             windows.append(" ".join(tokens[i:i+length]))
     return windows
 
+def extract_episode_tag(text: str) -> tuple[str, str]:
+    """Extracts and standardizes Season/Episode tags, removing them from text"""
+    # Matches: S01E01, S1 E1, s01e01, season 1 episode 1
+    s_e_match = re.search(r'(?i)\bs(?:eason)?\s*(\d{1,2})\s*e(?:p(?:isode)?)?\s*(\d{1,4})\b', text)
+    if s_e_match:
+        s, e = s_e_match.groups()
+        tag = f"S{int(s):02d}E{int(e):02d}"
+        clean_text = text[:s_e_match.start()] + " " + text[s_e_match.end():]
+        return tag, clean_text
+        
+    # Matches: Ep01, EP 1, Episode 1, E01
+    e_match = re.search(r'(?i)\b(?:e(?:p(?:isode)?)?)\s*(\d{1,4})\b', text)
+    if e_match:
+        e = e_match.groups()[0]
+        tag = f"E{int(e):02d}"
+        clean_text = text[:e_match.start()] + " " + text[e_match.end():]
+        return tag, clean_text
+        
+    return "", text
+
 async def extract_title_from_filename(filename: str) -> dict:
     """
     Nio's TMDB Sliding Window Extraction Pipeline
@@ -89,6 +109,9 @@ async def extract_title_from_filename(filename: str) -> dict:
     # 1. Normalize separators
     normalized = re.sub(r'[_\-\[\]\(\)#\.]', ' ', base_name)
     normalized = re.sub(r'\s+', ' ', normalized).strip()
+    
+    # 2. Episode Pre-Extraction Layer
+    extracted_episode, normalized = extract_episode_tag(normalized)
     
     # 2. Year Anchoring & Prefix Dropping
     tokens = normalized.split()
@@ -109,7 +132,7 @@ async def extract_title_from_filename(filename: str) -> dict:
             clean_tokens.append(token)
             
     if not clean_tokens:
-        return {"title": base_name, "year": extracted_year}
+        return {"title": base_name, "year": extracted_year, "episode": extracted_episode}
         
     # Generate windows
     windows = generate_windows(clean_tokens)
@@ -117,7 +140,7 @@ async def extract_title_from_filename(filename: str) -> dict:
     # If no TMDB Key, just return the full cleaned left side
     if not Config.TMDB_API_KEY:
         title = " ".join(clean_tokens)
-        return {"title": title, "year": extracted_year}
+        return {"title": title, "year": extracted_year, "episode": extracted_episode}
         
     # 3. Asynchronous TMDB Brute Force
     best_result = None
@@ -148,8 +171,9 @@ async def extract_title_from_filename(filename: str) -> dict:
         final_year = extracted_year if extracted_year else best_result["year"]
         return {
             "title": best_result["title"],
-            "year": final_year
+            "year": final_year,
+            "episode": extracted_episode
         }
         
     # Fallback if TMDB fails or confidence is too low
-    return {"title": " ".join(clean_tokens), "year": extracted_year}
+    return {"title": " ".join(clean_tokens), "year": extracted_year, "episode": extracted_episode}

@@ -25,6 +25,7 @@ async def generate_new_name(original_name: str, info: dict = None) -> str:
     title_data = await extract_title_from_filename(base_name)
     clean_title = title_data.get("title", base_name)
     clean_year = title_data.get("year", "")
+    clean_episode = title_data.get("episode", "")
     
     # Title Case for aesthetics (unless TMDB returned official casing)
     # Actually TMDB returns official casing! So we don't need .title() if TMDB succeeds!
@@ -38,6 +39,11 @@ async def generate_new_name(original_name: str, info: dict = None) -> str:
     # Append the Year if it exists
     if clean_year:
         base_name = f"{base_name}.{clean_year}"
+        
+    # Append the Episode Tag if it exists
+    if clean_episode:
+        base_name = f"{base_name}.{clean_episode}"
+        
     # Note: We removed the hardcoded acronyms dictionary because TMDB validation 
     # handles acronyms perfectly (e.g., returning "Spider-Man: No Way Home").
     # If TMDB fails, it just uses standard Title Case.
