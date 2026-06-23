@@ -43,11 +43,12 @@ def extract_languages_from_filename(filename: str) -> list:
 
 def get_resolution_bucket(width: int, height: int) -> str:
     pixels = width * height
-    if pixels >= 3800000: return "4K"
-    elif pixels >= 1800000: return "1080p"
-    elif pixels >= 800000: return "720p"
-    elif pixels >= 350000: return "480p"
-    elif pixels >= 200000: return "360p"
+    # Thresholds tuned for cinematic (2.35:1) aspect ratios
+    if pixels >= 3500000: return "4K"
+    elif pixels >= 1400000: return "1080p" # Cinematic 1080p is ~1920x800 (1.53M)
+    elif pixels >= 600000: return "720p"   # Cinematic 720p is ~1280x536 (686K)
+    elif pixels >= 300000: return "480p"   # Cinematic 480p is ~854x360 (307K)
+    elif pixels >= 150000: return "360p"   # Cinematic 360p is ~640x272 (174K) or 608x256 (155K)
     else: return "240p"
 
 async def get_video_info(file_path: str, original_name: str = "") -> dict:
