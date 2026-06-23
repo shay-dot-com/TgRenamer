@@ -69,7 +69,8 @@ async def generate_new_name(original_name: str, info: dict = None) -> str:
             
         if info.get("video_codec") and info["video_codec"] != "Unknown":
             v_codec = info["video_codec"]
-            if v_codec == "X265": v_codec = "HEVC" # Use HEVC as requested
+            if v_codec == "X265": v_codec = "x265" 
+            elif v_codec == "X264": v_codec = "x264"
             tags.append(v_codec)
             
         # Add bit depth (including 8Bit now)
