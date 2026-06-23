@@ -37,8 +37,8 @@ async def process_video(input_path: str, output_path: str, new_title: str) -> bo
 
 async def generate_thumbnail(video_path: str, output_path: str, duration: int) -> bool:
     """Extracts a thumbnail from the video."""
-    # Target 10 minutes (600s), or half of duration if shorter
-    target_time = 600 if duration > 1200 else duration // 2
+    # Extract at EXACTLY the 10% mark dynamically
+    target_time = max(1, duration // 10)
     target_time_str = str(target_time)
 
     cmd = [

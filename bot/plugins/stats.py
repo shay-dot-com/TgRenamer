@@ -2,6 +2,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message
 import psutil
 import time
+from database.db import db
 
 # Record start time for uptime calculation
 START_TIME = time.time()
@@ -37,12 +38,19 @@ async def stats_command(client: Client, message: Message):
     uptime_sec = int(time.time() - START_TIME)
     uptime_str = get_readable_time(uptime_sec)
     
+    # Get Queue Stats
+    pending_count, processing_count = await db.get_queue_count()
+    total_queue = pending_count + processing_count
+    
     stats_text = (
         "**📊 System Performance**\n\n"
         f"**CPU Usage:** `{cpu_percent}%`\n"
         f"**RAM Usage:** `{ram_percent}%`\n"
         f"**Uptime:** `{uptime_str}`\n\n"
-        "*(Queue statistics will be integrated soon)*"
+        "**📥 Active Queue Status**\n"
+        f"**Processing Now:** `{processing_count} files`\n"
+        f"**Waiting in Queue:** `{pending_count} files`\n"
+        f"**Total Backlog:** `{total_queue} files`"
     )
     
     await message.reply_text(stats_text, quote=True)

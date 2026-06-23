@@ -40,6 +40,12 @@ class Database:
         """Fetches files that are pending or stuck in processing from a crash"""
         return await self.queue.find({"status": {"$in": ["PENDING", "PROCESSING"]}}).to_list(length=None)
 
+    async def get_queue_count(self):
+        """Returns the total number of items currently in queue"""
+        pending = await self.queue.count_documents({"status": "PENDING"})
+        processing = await self.queue.count_documents({"status": "PROCESSING"})
+        return pending, processing
+
     async def update_status(self, document_id, new_status):
         await self.queue.update_one({"_id": document_id}, {"$set": {"status": new_status}})
 
