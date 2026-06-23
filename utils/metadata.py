@@ -1,10 +1,56 @@
 import asyncio
 import json
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
-async def get_video_info(file_path: str) -> dict:
+def extract_languages_from_filename(filename: str) -> list:
+    lang_patterns = {
+        "tamil": "Tamil", "tam": "Tamil",
+        "telugu": "Telugu", "tel": "Telugu",
+        "hindi": "Hindi", "hin": "Hindi",
+        "malayalam": "Malayalam", "mal": "Malayalam",
+        "kannada": "Kannada", "kan": "Kannada",
+        "english": "English", "eng": "English",
+        "spanish": "Spanish", "french": "French",
+        "japanese": "Japanese", "korean": "Korean",
+        "chinese": "Chinese"
+    }
+    
+    scores = {v: 0 for v in set(lang_patterns.values())}
+    filename_lower = filename.lower()
+    
+    tokens = re.split(r'[^a-z0-9]', filename_lower)
+    
+    for i, token in enumerate(tokens):
+        if token in lang_patterns:
+            lang = lang_patterns[token]
+            scores[lang] += 5 # Base score
+            
+            # Context checking
+            next_token = tokens[i+1] if i+1 < len(tokens) else ""
+            if "dub" in next_token or "audio" in next_token:
+                scores[lang] += 10
+            elif "sub" in next_token or "esub" in next_token or "msub" in next_token:
+                scores[lang] -= 10
+                
+            prev_token = tokens[i-1] if i-1 >= 0 else ""
+            if "dub" in prev_token or "audio" in prev_token:
+                scores[lang] += 10
+                
+    return [lang for lang, score in scores.items() if score > 0]
+
+def get_resolution_bucket(width: int, height: int) -> str:
+    pixels = width * height
+    if pixels >= 3800000: return "4K"
+    elif pixels >= 1800000: return "1080p"
+    elif pixels >= 800000: return "720p"
+    elif pixels >= 350000: return "480p"
+    elif pixels >= 200000: return "360p"
+    else: return "240p"
+
+async def get_video_info(file_path: str, original_name: str = "") -> dict:
     cmd = [
         "ffprobe",
         "-v", "error",
@@ -32,6 +78,7 @@ async def get_video_info(file_path: str) -> dict:
             "duration": 0,
             "width": 0,
             "height": 0,
+            "resolution": "",
             "video_codec": "Unknown",
             "video_profile": "",
             "audio_codecs": [],
@@ -73,16 +120,34 @@ async def get_video_info(file_path: str) -> dict:
                         info["audio_codecs"].append(codec)
                         
                     tags = stream.get("tags", {})
+                    # Priority 1: ISO language tag
                     lang = tags.get("language", "und").lower()
                     if lang != "und" and lang not in info["audio_languages"]:
                         info["audio_languages"].append(lang)
+                    else:
+                        # Priority 1.5: Stream Title check
+                        title = tags.get("title", "").lower()
+                        extracted = extract_languages_from_filename(title)
+                        for l in extracted:
+                            if l not in info["audio_languages"]:
+                                info["audio_languages"].append(l)
                         
                 elif c_type == "subtitle":
                     info["subs_count"] += 1
                     
-            # Default to English if audio tracks exist but no language is found
-            if info["audio_count"] >= 1 and not info["audio_languages"]:
-                info["audio_languages"] = ["eng"]
+            # Priority 2: Filename Language Parsing
+            if info["audio_count"] >= 1 and not info["audio_languages"] and original_name:
+                extracted = extract_languages_from_filename(original_name)
+                info["audio_languages"] = extracted
+                
+            # Resolution Detection
+            res_match = re.search(r'(2160p|1440p|1080p|720p|480p|360p|240p)', original_name.lower())
+            if res_match:
+                info["resolution"] = res_match.group(1)
+            elif info["width"] > 0:
+                info["resolution"] = get_resolution_bucket(info["width"], info["height"])
+            else:
+                info["resolution"] = "Unknown"
                     
         return info
     except Exception as e:

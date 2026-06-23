@@ -26,12 +26,7 @@ def generate_caption(file_name: str, info: dict, original_size: int) -> str:
     height = info.get("height", 0)
     
     # Determine basic resolution string
-    res_str = "Unknown"
-    if width >= 3840 or height >= 2160: res_str = "4K"
-    elif width >= 1920 or height >= 1080: res_str = "1080p"
-    elif width >= 1280 or height >= 720: res_str = "720p"
-    elif width >= 854 or height >= 480: res_str = "480p"
-    elif height > 0: res_str = f"{width}x{height}"
+    res_str = info.get("resolution", "Unknown")
     
     # Video string
     vid_tags = [res_str]
@@ -39,10 +34,7 @@ def generate_caption(file_name: str, info: dict, original_size: int) -> str:
     if info.get("video_profile"): vid_tags.append(info.get("video_profile"))
     video_str = " | ".join(vid_tags)
     
-    # Audio string
-    audio_tags = []
-    
-    # Map ISO codes to full names
+    # Map ISO codes to full names just in case ffprobe gave short codes
     lang_map = {
         "hin": "Hindi", "eng": "English", "tam": "Tamil", "tel": "Telugu",
         "mal": "Malayalam", "kan": "Kannada", "spa": "Spanish", "fra": "French",
@@ -52,21 +44,11 @@ def generate_caption(file_name: str, info: dict, original_size: int) -> str:
     
     parsed_langs = []
     for l in info.get("audio_languages", []):
-        parsed_langs.append(lang_map.get(l, l.title()))
+        # Only title case if not already title cased
+        parsed_langs.append(lang_map.get(l.lower(), l.title() if l.islower() else l))
         
-    if info.get("audio_count", 0) > 1:
-        if parsed_langs:
-            audio_tags.append(f"Dual Audio ({', '.join(parsed_langs)})" if info["audio_count"] == 2 else f"Multi Audio ({', '.join(parsed_langs)})")
-        else:
-            audio_tags.append("Dual Audio" if info["audio_count"] == 2 else "Multi Audio")
-    elif info.get("audio_count", 0) == 1:
-        if parsed_langs:
-            audio_tags.append(parsed_langs[0])
-            
-    if info.get("audio_codecs"):
-        audio_tags.append(", ".join(info.get("audio_codecs")))
-        
-    audio_str = " | ".join(audio_tags) if audio_tags else "Unknown"
+    lang_str = ", ".join(parsed_langs) if parsed_langs else "Unknown"
+    codec_str = ", ".join(info.get("audio_codecs", [])) if info.get("audio_codecs") else "Unknown"
     
     # Subs string
     subs_str = ""
@@ -101,7 +83,8 @@ def generate_caption(file_name: str, info: dict, original_size: int) -> str:
             f"📺 **Season:** `{season}`\n"
             f"🍿 **Episode:** `{episode}`\n"
             f"⚙️ **Video:** `{video_str}`\n"
-            f"🔊 **Audio:** `{audio_str}`\n"
+            f"🔊 **Audio Codec:** `{codec_str}`\n"
+            f"🗣 **Language:** `{lang_str}`\n"
             f"{subs_str}"
             f"⏱ **Duration:** `{duration_str}`\n"
             f"💾 **Size:** `{size_str}`"
@@ -110,7 +93,8 @@ def generate_caption(file_name: str, info: dict, original_size: int) -> str:
         caption = (
             f"**{clean_name}**\n\n"
             f"⚙️ **Video:** `{video_str}`\n"
-            f"🔊 **Audio:** `{audio_str}`\n"
+            f"🔊 **Audio Codec:** `{codec_str}`\n"
+            f"🗣 **Language:** `{lang_str}`\n"
             f"{subs_str}"
             f"⏱ **Duration:** `{duration_str}`\n"
             f"💾 **Size:** `{size_str}`"
