@@ -162,11 +162,16 @@ async def extract_title_from_filename(filename: str) -> dict:
         valid_results = [r for r in results if r is not None]
         
         if valid_results:
-            # Sort by confidence then popularity
-            valid_results.sort(key=lambda x: (x["confidence"], x["popularity"]), reverse=True)
-            best_result = valid_results[0]
+            # Sort by number of words DESC (to prefer longer valid phrases), then by confidence
+            valid_results.sort(key=lambda x: (len(x["query"].split()), x["confidence"], x["popularity"]), reverse=True)
             
-    if best_result and best_result["confidence"] >= 60: # Threshold for accepting a match
+            # Accept the longest phrase that meets our minimum confidence threshold
+            for res in valid_results:
+                if res["confidence"] >= 60:
+                    best_result = res
+                    break
+            
+    if best_result: 
         # If TMDB found a year and we didn't have one, use TMDB's year!
         final_year = extracted_year if extracted_year else best_result["year"]
         return {
