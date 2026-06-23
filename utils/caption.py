@@ -27,10 +27,10 @@ def generate_caption(file_name: str, info: dict, original_size: int) -> str:
     
     # Determine basic resolution string
     res_str = "Unknown"
-    if height >= 2160: res_str = "4K"
-    elif height >= 1080: res_str = "1080p"
-    elif height >= 720: res_str = "720p"
-    elif height >= 480: res_str = "480p"
+    if width >= 3840 or height >= 2160: res_str = "4K"
+    elif width >= 1920 or height >= 1080: res_str = "1080p"
+    elif width >= 1280 or height >= 720: res_str = "720p"
+    elif width >= 854 or height >= 480: res_str = "480p"
     elif height > 0: res_str = f"{width}x{height}"
     
     # Video string
@@ -41,23 +41,28 @@ def generate_caption(file_name: str, info: dict, original_size: int) -> str:
     
     # Audio string
     audio_tags = []
+    
+    # Map ISO codes to full names
+    lang_map = {
+        "hin": "Hindi", "eng": "English", "tam": "Tamil", "tel": "Telugu",
+        "mal": "Malayalam", "kan": "Kannada", "spa": "Spanish", "fra": "French",
+        "jpn": "Japanese", "kor": "Korean", "chi": "Chinese", "en": "English",
+        "hi": "Hindi", "ta": "Tamil", "te": "Telugu", "ml": "Malayalam"
+    }
+    
+    parsed_langs = []
+    for l in info.get("audio_languages", []):
+        parsed_langs.append(lang_map.get(l, l.title()))
+        
     if info.get("audio_count", 0) > 1:
-        langs = []
-        for l in info.get("audio_languages", []):
-            if l == "hin": langs.append("Hindi")
-            elif l == "eng": langs.append("English")
-            elif l == "tam": langs.append("Tamil")
-            elif l == "tel": langs.append("Telugu")
-            elif l == "mal": langs.append("Malayalam")
-            
-        if langs:
-            audio_tags.append(f"Dual Audio ({', '.join(langs)})" if info["audio_count"] == 2 else f"Multi Audio ({', '.join(langs)})")
+        if parsed_langs:
+            audio_tags.append(f"Dual Audio ({', '.join(parsed_langs)})" if info["audio_count"] == 2 else f"Multi Audio ({', '.join(parsed_langs)})")
         else:
             audio_tags.append("Dual Audio" if info["audio_count"] == 2 else "Multi Audio")
     elif info.get("audio_count", 0) == 1:
-        if "eng" in info.get("audio_languages", []): audio_tags.append("English")
-        elif "hin" in info.get("audio_languages", []): audio_tags.append("Hindi")
-        
+        if parsed_langs:
+            audio_tags.append(parsed_langs[0])
+            
     if info.get("audio_codecs"):
         audio_tags.append(", ".join(info.get("audio_codecs")))
         

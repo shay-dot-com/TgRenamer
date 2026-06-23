@@ -9,7 +9,7 @@ async def get_video_info(file_path: str) -> dict:
         "ffprobe",
         "-v", "error",
         "-show_entries", "format=duration",
-        "-show_entries", "stream=codec_type,codec_name,profile,width,height,tags",
+        "-show_entries", "stream=codec_type,codec_name,profile,width,height,pix_fmt,tags",
         "-of", "json",
         file_path
     ]
@@ -58,9 +58,10 @@ async def get_video_info(file_path: str) -> dict:
                     info["video_codec"] = codec.upper() if codec != "Unknown" else codec
                     
                     profile = stream.get("profile", "")
-                    if "10" in profile.lower():
+                    pix_fmt = stream.get("pix_fmt", "")
+                    if "10" in profile.lower() or "10" in pix_fmt.lower() or "hdr" in profile.lower():
                         info["video_profile"] = "10Bit"
-                    elif "8" in profile.lower() or profile.lower() in ["main", "high"]:
+                    elif "8" in profile.lower() or "8" in pix_fmt.lower() or profile.lower() in ["main", "high"]:
                         info["video_profile"] = "8Bit"
                         
                 elif c_type == "audio":
@@ -70,7 +71,7 @@ async def get_video_info(file_path: str) -> dict:
                         info["audio_codecs"].append(codec)
                         
                     tags = stream.get("tags", {})
-                    lang = tags.get("language", "und")
+                    lang = tags.get("language", "und").lower()
                     if lang != "und" and lang not in info["audio_languages"]:
                         info["audio_languages"].append(lang)
                         
