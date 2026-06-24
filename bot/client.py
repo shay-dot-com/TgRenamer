@@ -26,7 +26,7 @@ bot = Client(
     plugins=dict(root="bot.plugins"),
     workers=Config.WORKERS,
     proxy=proxy_dict,
-    max_concurrent_transmissions=10,
+    max_concurrent_transmissions=3,
     sleep_threshold=60
 )
 
@@ -40,7 +40,7 @@ if Config.STRING_SESSION:
         session_string=Config.STRING_SESSION,
         workers=Config.WORKERS,
         proxy=proxy_dict,
-        max_concurrent_transmissions=10,
+        max_concurrent_transmissions=3,
         sleep_threshold=60
     )
     logger.info("Premium String Session detected. 4GB Userbot upgrade is ENABLED.")

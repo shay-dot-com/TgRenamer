@@ -19,11 +19,11 @@ async def main():
     try:
         await start_clients()
         
-        # Start 5 parallel background workers
-        for _ in range(5):
+        # Start 2 parallel background workers to prevent bandwidth starvation
+        for _ in range(2):
             asyncio.create_task(queue_worker())
         
-        logger.info("Bot is running with 5 parallel workers! Press Ctrl+C to stop.")
+        logger.info("Bot is running with 2 parallel workers! Press Ctrl+C to stop.")
         await idle()
         
     except KeyboardInterrupt:
