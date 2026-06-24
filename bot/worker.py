@@ -46,9 +46,16 @@ async def process_item(item):
         original_size = getattr(file, "file_size", 0)
         original_caption = getattr(message, "caption", "") or ""
         
-        # Check if caption is a user override (short, no links, no @ tags)
+        # Check if caption is a user override
         custom_title = None
-        if original_caption and len(original_caption) < 60:
+        # 1. Explicit override (User added "Title: Movie Name" anywhere in the caption)
+        title_match = re.search(r'(?i)Title:\s*([^\n]+)', original_caption)
+        if title_match:
+            custom_title = title_match.group(1).strip()
+            # Clean it so we don't accidentally pass HTML/Markdown to the extractor
+            custom_title = re.sub(r'[\*\_~`]', '', custom_title)
+        # 2. Implicit override (User completely replaced the caption with a short string)
+        elif original_caption and len(original_caption) < 60:
             if not re.search(r'(@|t\.me|http|join|subscribe)', original_caption, re.IGNORECASE):
                 custom_title = original_caption
         
