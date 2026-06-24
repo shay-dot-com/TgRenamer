@@ -126,6 +126,21 @@ def extract_languages_from_caption(caption: str) -> list:
     # If no specific line, scan the whole caption but rely on scoring logic
     return extract_languages_from_filename(caption)
 
+async def _run_mediainfo(file_path: str) -> dict:
+    try:
+        cmd = ["mediainfo", "--ParseSpeed=0", "--Language=raw", "--Output=JSON", file_path]
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=15)
+        if process.returncode == 0:
+            return json.loads(stdout.decode() or '{}')
+    except Exception as e:
+        logger.warning(f"mediainfo fallback failed (is mediainfo installed?): {e}")
+    return {}
+
 async def get_video_info(file_path: str, original_name: str = "", original_caption: str = "") -> dict:
     cmd = [
         "ffprobe",
@@ -271,6 +286,29 @@ async def get_video_info(file_path: str, original_name: str = "", original_capti
                             mapped_l = get_full_language_name(l)
                             if mapped_l not in info["subs_languages"] and mapped_l != "Unknown":
                                 info["subs_languages"].append(mapped_l)
+                                
+            # Priority 1.7: MediaInfo Deep Track Parsing Fallback (For MKVs with missing ffprobe tags)
+            if (info["subs_count"] > 0 and not info["subs_languages"]) or (info["audio_count"] > 0 and not info["audio_languages"]):
+                logger.info("Falling back to MediaInfo for hidden MKV tracks...")
+                mi_data = await _run_mediainfo(file_path)
+                tracks = mi_data.get("media", {}).get("track", [])
+                for track in tracks:
+                    if not isinstance(track, dict): continue
+                    t = (track.get("@type", "") or "").lower()
+                    
+                    if t in ("text", "subtitle", "menu") and not info["subs_languages"]:
+                        lang = track.get("Language") or track.get("Language_String") or "und"
+                        if lang != "und":
+                            mapped_lang = get_full_language_name(lang)
+                            if mapped_lang not in info["subs_languages"] and mapped_lang != "Unknown":
+                                info["subs_languages"].append(mapped_lang)
+                                
+                    elif t == "audio" and not info["audio_languages"]:
+                        lang = track.get("Language") or track.get("Language_String") or "und"
+                        if lang != "und":
+                            mapped_lang = get_full_language_name(lang)
+                            if mapped_lang not in info["audio_languages"] and mapped_lang != "Unknown":
+                                info["audio_languages"].append(mapped_lang)
                     
             # Priority 2: Original Caption Language Parsing
             if info["audio_count"] >= 1 and not info["audio_languages"] and original_caption:

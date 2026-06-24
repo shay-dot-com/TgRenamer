@@ -96,25 +96,27 @@ def generate_windows(tokens: list) -> list:
             windows.append(" ".join(tokens[i:i+length]))
     return windows
 
-def extract_episode_tag(text: str) -> tuple[str, str]:
-    """Extracts and standardizes Season/Episode tags, removing them from text"""
+def extract_episode_tag(text: str) -> tuple[str, str, str]:
+    """Extracts and standardizes Season/Episode tags, splitting text into prefix and suffix"""
     # Matches: S01E01, S1 E1, s01e01, season 1 episode 1
     s_e_match = re.search(r'(?i)\bs(?:eason)?\s*(\d{1,2})\s*e(?:p(?:isode)?)?\s*(\d{1,4})\b', text)
     if s_e_match:
         s, e = s_e_match.groups()
         tag = f"S{int(s):02d}E{int(e):02d}"
-        clean_text = text[:s_e_match.start()] + " " + text[s_e_match.end():]
-        return tag, clean_text
+        prefix = text[:s_e_match.start()].strip()
+        suffix = text[s_e_match.end():].strip()
+        return tag, prefix, suffix
         
     # Matches: Ep01, EP 1, Episode 1, E01
     e_match = re.search(r'(?i)\b(?:e(?:p(?:isode)?)?)\s*(\d{1,4})\b', text)
     if e_match:
         e = e_match.groups()[0]
         tag = f"E{int(e):02d}"
-        clean_text = text[:e_match.start()] + " " + text[e_match.end():]
-        return tag, clean_text
+        prefix = text[:e_match.start()].strip()
+        suffix = text[e_match.end():].strip()
+        return tag, prefix, suffix
         
-    return "", text
+    return "", text, ""
 
 def remove_channel_tags(text: str) -> str:
     """Aggressively strips @Channel tags before tokenization"""
@@ -143,10 +145,12 @@ async def extract_title_from_filename(filename: str) -> dict:
     normalized = re.sub(r'\s+', ' ', normalized).strip()
     
     # 2. Episode Pre-Extraction Layer
-    extracted_episode, normalized = extract_episode_tag(normalized)
+    extracted_episode, prefix_text, suffix_text = extract_episode_tag(normalized)
     
-    # 2. Year Anchoring & Prefix Dropping
-    tokens = normalized.split()
+    # 2. Year Anchoring & Prefix Dropping (Using ONLY the Series Prefix if it's an episode)
+    search_base = prefix_text if extracted_episode else prefix_text
+    
+    tokens = search_base.split()
     clean_tokens = []
     extracted_year = ""
     
@@ -164,7 +168,7 @@ async def extract_title_from_filename(filename: str) -> dict:
             clean_tokens.append(token)
             
     if not clean_tokens:
-        return {"title": base_name, "year": extracted_year, "episode": extracted_episode}
+        return {"title": search_base, "year": extracted_year, "episode": extracted_episode}
         
     # Generate windows
     windows = generate_windows(clean_tokens)
