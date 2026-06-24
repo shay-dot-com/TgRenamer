@@ -34,28 +34,26 @@ def generate_caption(file_name: str, info: dict, original_size: int) -> str:
     if info.get("video_profile"): vid_tags.append(info.get("video_profile"))
     video_str = " | ".join(vid_tags)
     
-    # Map ISO codes to full names just in case ffprobe gave short codes
-    lang_map = {
-        "hin": "Hindi", "eng": "English", "tam": "Tamil", "tel": "Telugu",
-        "mal": "Malayalam", "kan": "Kannada", "spa": "Spanish", "fra": "French",
-        "jpn": "Japanese", "kor": "Korean", "chi": "Chinese", "en": "English",
-        "hi": "Hindi", "ta": "Tamil", "te": "Telugu", "ml": "Malayalam"
-    }
-    
-    parsed_langs = []
-    for l in info.get("audio_languages", []):
-        # Only title case if not already title cased
-        parsed_langs.append(lang_map.get(l.lower(), l.title() if l.islower() else l))
-        
-    lang_str = ", ".join(parsed_langs) if parsed_langs else "Unknown"
+    lang_str = ", ".join(info.get("audio_languages", [])) if info.get("audio_languages") else "Unknown"
     codec_str = ", ".join(info.get("audio_codecs", [])) if info.get("audio_codecs") else "Unknown"
     
     # Subs string
     subs_str = ""
-    if info.get("subs_count", 0) > 1:
-        subs_str = f"💬 **Subs:** `M-Sub`\n"
-    elif info.get("subs_count", 0) == 1:
-        subs_str = f"💬 **Subs:** `E-Sub`\n"
+    subs_count = info.get("subs_count", 0)
+    subs_langs = info.get("subs_languages", [])
+    
+    if subs_count > 0:
+        if subs_langs:
+            lang_list = ", ".join(subs_langs)
+            if subs_count > 1:
+                subs_str = f"💬 **Subs:** `M-Sub ({lang_list})`\n"
+            else:
+                subs_str = f"💬 **Subs:** `E-Sub ({lang_list})`\n"
+        else:
+            if subs_count > 1:
+                subs_str = f"💬 **Subs:** `M-Sub`\n"
+            else:
+                subs_str = f"💬 **Subs:** `E-Sub`\n"
         
     # Series vs Movie
     season = None
