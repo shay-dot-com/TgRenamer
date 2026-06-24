@@ -1,24 +1,26 @@
 import re
 from utils.title_extractor import extract_title_from_filename
 
-async def generate_new_name(original_name: str, info: dict = None) -> tuple[str, str]:
+async def generate_new_name(original_name: str, info: dict = None, custom_title: str = None) -> tuple[str, str]:
     if not original_name:
         return "Unknown_File", "Unknown_File"
 
-    name = original_name
-
-    # 1. Strip leading brackets like [IMDB] or (TelegramChannel) from the VERY start of the filename
-    name = re.sub(r'^\[.*?\] *|^\(.*?\) *', '', name)
-
-    # 2. Remove Telegram links securely
-    name = re.sub(r't\.me/[a-zA-Z0-9_]+', '', name, flags=re.IGNORECASE)
-    
     # Extract extension
-    parts = name.rsplit('.', 1)
-    if len(parts) > 1:
-        base_name, ext = parts[0], parts[1]
+    parts = original_name.rsplit('.', 1)
+    ext = parts[1] if len(parts) > 1 else ""
+
+    if custom_title:
+        base_name = custom_title
     else:
-        base_name, ext = name, ""
+        name = original_name
+
+        # 1. Strip leading brackets like [IMDB] or (TelegramChannel) from the VERY start of the filename
+        name = re.sub(r'^\[.*?\] *|^\(.*?\) *', '', name)
+
+        # 2. Remove Telegram links securely
+        name = re.sub(r't\.me/[a-zA-Z0-9_]+', '', name, flags=re.IGNORECASE)
+        
+        base_name = name.rsplit('.', 1)[0] if len(parts) > 1 else name
         
     # Semantic TMDB Title Extraction
     title_data = await extract_title_from_filename(base_name)

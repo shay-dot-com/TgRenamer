@@ -46,6 +46,12 @@ async def process_item(item):
         original_size = getattr(file, "file_size", 0)
         original_caption = getattr(message, "caption", "") or ""
         
+        # Check if caption is a user override (short, no links, no @ tags)
+        custom_title = None
+        if original_caption and len(original_caption) < 60:
+            if not re.search(r'(@|t\.me|http|join|subscribe)', original_caption, re.IGNORECASE):
+                custom_title = original_caption
+        
         # Setup Cancel Button
         cancel_markup = InlineKeyboardMarkup([[
             InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{str(doc_id)}")
@@ -85,7 +91,7 @@ async def process_item(item):
         info = await get_video_info(input_path, original_name, original_caption)
         
         # 3. Generate New Dynamic Name
-        file_name, display_name = await generate_new_name(original_name, info)
+        file_name, display_name = await generate_new_name(original_name, info, custom_title)
         output_path = os.path.join(DOWNLOAD_DIR, file_name)
         
         # 4. Process via FFmpeg

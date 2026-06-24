@@ -34,45 +34,47 @@ async def search_tmdb(query: str, session: aiohttp.ClientSession) -> dict:
                 if data.get("results"):
                     best_match = data["results"][0]
                     
-                    # Extract title
-                    title = best_match.get("title") or best_match.get("name")
-                    
-                    # Extract year
-                    date_str = best_match.get("release_date") or best_match.get("first_air_date") or ""
-                    year = date_str[:4] if date_str else ""
-                    
-                    # Calculate a confidence score
-                    # Heuristic: Exact string match is highest confidence
-                    popularity = best_match.get("popularity", 0)
-                    query_lower = query.lower()
-                    title_lower = title.lower() if title else ""
-                    
-                    confidence = 50 # Base
-                    if query_lower == title_lower:
-                        confidence += 40
-                    elif title_lower in query_lower or query_lower in title_lower:
-                        confidence += 20
-                    else:
-                        # TMDB Hallucination Penalty: if TMDB returns a totally different string
-                        confidence -= 40
+                for r in data.get("results", []):
+                    # Ignore people (actors/directors)
+                    if r.get("media_type") not in ["movie", "tv"]:
+                        continue
                         
-                    # Heavily penalize short 1-word queries that are only partial matches
-                    # e.g. query "360" matching "Anderson Cooper 360"
-                    if len(query.split()) == 1 and len(query) <= 4:
-                        if query_lower != title_lower:
+                    title = r.get("title") or r.get("name")
+                    year_str = r.get("release_date") or r.get("first_air_date")
+                    year = year_str.split("-")[0] if year_str else ""
+                    popularity = r.get("popularity", 0)
+                    
+                    if title:
+                        query_lower = query.lower()
+                        title_lower = title.lower()
+                        confidence = 50 # Base
+                        
+                        if expected_year and year and str(year) == expected_year:
+                            confidence += 30 # Massive boost if the uploader's year matches exactly!
+                        if query_lower == title_lower:
+                            confidence += 40
+                        elif title_lower in query_lower or query_lower in title_lower:
+                            confidence += 20
+                        else:
+                            # TMDB Hallucination Penalty: if TMDB returns a totally different string
                             confidence -= 40
                             
-                    # Boost by popularity (max +10)
-                    confidence += min(popularity / 10, 10)
-                    
-                    return {
-                        "query": query,
-                        "title": title,
-                        "year": year,
-                        "confidence": confidence,
-                        "popularity": popularity,
-                        "media_type": best_match.get("media_type")
-                    }
+                        # Heavily penalize short 1-word queries that are only partial matches
+                        if len(query.split()) == 1 and len(query) <= 4:
+                            if query_lower != title_lower:
+                                confidence -= 40
+                                
+                        # Boost by popularity (max +10)
+                        confidence += min(popularity / 10, 10)
+                        
+                        return {
+                            "query": query,
+                            "title": title,
+                            "year": year,
+                            "confidence": confidence,
+                            "popularity": popularity,
+                            "media_type": r.get("media_type")
+                        }
     except Exception as e:
         logger.error(f"TMDB Search failed for {query}: {e}")
     return None
@@ -178,7 +180,7 @@ async def extract_title_from_filename(filename: str) -> dict:
         connector = ProxyConnector.from_url(proxy_url)
         
     async with aiohttp.ClientSession(connector=connector) as session:
-        tasks = [search_tmdb(window, session) for window in search_windows]
+        tasks = [search_tmdb(window, session, extracted_year) for window in search_windows]
         results = await asyncio.gather(*tasks)
         
         valid_results = [r for r in results if r is not None]
@@ -194,8 +196,8 @@ async def extract_title_from_filename(filename: str) -> dict:
                     break
             
     if best_result: 
-        # If TMDB found a year and we didn't have one, use TMDB's year!
-        final_year = extracted_year if extracted_year else best_result["year"]
+        # TMDB's year is the ultimate truth. Overwrite the uploader's year if TMDB found one!
+        final_year = best_result.get("year") or extracted_year
         return {
             "title": best_result["title"],
             "year": final_year,
