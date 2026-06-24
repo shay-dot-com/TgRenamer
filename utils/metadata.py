@@ -70,17 +70,11 @@ def get_full_language_name(code: str) -> str:
     return _LANGUAGE_MAP.get(cleaned.lower(), cleaned.title() if cleaned.islower() else cleaned)
 
 def extract_languages_from_filename(filename: str) -> list:
-    lang_patterns = {
-        "tamil": "Tamil", "tam": "Tamil",
-        "telugu": "Telugu", "tel": "Telugu",
-        "hindi": "Hindi", "hin": "Hindi",
-        "malayalam": "Malayalam", "mal": "Malayalam",
-        "kannada": "Kannada", "kan": "Kannada",
-        "english": "English", "eng": "English",
-        "spanish": "Spanish", "french": "French",
-        "japanese": "Japanese", "korean": "Korean",
-        "chinese": "Chinese"
-    }
+    lang_patterns = {}
+    for code, full_name in _LANGUAGE_MAP.items():
+        if full_name != "Unknown":
+            lang_patterns[full_name.lower()] = full_name
+            lang_patterns[code.lower()] = full_name
     
     scores = {v: 0 for v in set(lang_patterns.values())}
     filename_lower = filename.lower()
