@@ -52,6 +52,9 @@ async def search_tmdb(query: str, session: aiohttp.ClientSession) -> dict:
                         confidence += 40
                     elif title_lower in query_lower or query_lower in title_lower:
                         confidence += 20
+                    else:
+                        # TMDB Hallucination Penalty: if TMDB returns a totally different string
+                        confidence -= 40
                         
                     # Boost by popularity (max +10)
                     confidence += min(popularity / 10, 10)
@@ -97,6 +100,16 @@ def extract_episode_tag(text: str) -> tuple[str, str]:
         
     return "", text
 
+def remove_channel_tags(text: str) -> str:
+    """Aggressively strips @Channel tags before tokenization"""
+    # 1. Remove "Channel @XYZ "
+    text = re.sub(r'(?i)^channel\s*@[a-z0-9_]+[\s\._\-]*', '', text)
+    
+    # 2. Remove "@XYZ " or "@XYZ_" or "@XYZ."
+    text = re.sub(r'^@[a-z0-9_]+[\s\._\-]*', '', text)
+    
+    return text
+
 async def extract_title_from_filename(filename: str) -> dict:
     """
     Nio's TMDB Sliding Window Extraction Pipeline
@@ -105,6 +118,9 @@ async def extract_title_from_filename(filename: str) -> dict:
     
     # Remove file extension
     base_name = filename.rsplit('.', 1)[0]
+    
+    # 0. Pre-Extraction Channel Tag Erasure
+    base_name = remove_channel_tags(base_name)
     
     # 1. Normalize separators
     normalized = re.sub(r'[_\-\[\]\(\)#\.]', ' ', base_name)
@@ -119,12 +135,12 @@ async def extract_title_from_filename(filename: str) -> dict:
     extracted_year = ""
     
     for i, token in enumerate(tokens):
-        # Stop at the first valid Year (19XX or 20XX)
-        if re.match(r'^(19\d{2}|20\d{2})$', token):
+        # Stop at the first valid Year (13XX, 14XX for Persian, 19XX, 20XX for Gregorian)
+        if re.match(r'^(13\d{2}|14\d{2}|19\d{2}|20\d{2})$', token):
             extracted_year = token
             break
             
-        # Strip @ prefix token if it's the very first token
+        # Strip @ prefix token if it's the very first token (Fallback if remove_channel_tags missed it)
         if i == 0 and token.startswith('@'):
             token = token[1:] # Just remove the @, we let sliding window handle the rest
             

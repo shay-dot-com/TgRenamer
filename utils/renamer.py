@@ -12,7 +12,6 @@ async def generate_new_name(original_name: str, info: dict = None) -> str:
 
     # 2. Remove Telegram links securely
     name = re.sub(r't\.me/[a-zA-Z0-9_]+', '', name, flags=re.IGNORECASE)
-    name = name.replace('@', '')
     
     # Extract extension
     parts = name.rsplit('.', 1)
@@ -49,6 +48,7 @@ async def generate_new_name(original_name: str, info: dict = None) -> str:
     # If TMDB fails, it just uses standard Title Case.
     
     base_name = base_name.strip('.') # Clean trailing dots
+    base_name = base_name.replace('@', '') # Clean any remaining @ symbols
     
     # 5. Inject accurate dynamic metadata
     if info:
