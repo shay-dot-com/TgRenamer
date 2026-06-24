@@ -10,6 +10,7 @@ from utils.ffmpeg import process_video, generate_thumbnail
 from utils.caption import generate_caption
 from utils.progress import progress_for_pyrogram
 from utils.state import CANCEL_TASKS
+from utils.fast_dl import fast_download
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import time
 
@@ -29,18 +30,30 @@ async def process_item(item):
         # Mark as processing
         await db.update_status(doc_id, "PROCESSING")
         
-        # Get message
-        client = userbot if userbot else bot
+        # Try fetching with bot first to utilize the fast 4x Bot client pool
         try:
-            message = await client.get_messages(chat_id, message_id)
-        except Exception as e:
-            logger.error(f"Failed to get message {message_id}: {e}")
+            message = await bot.get_messages(chat_id, message_id)
+        except:
+            message = None
+            
+        file_size_check = 0
+        if message and message.media:
+            file_size_check = getattr(getattr(message, message.media.value), "file_size", 0)
+            
+        # If bot failed to fetch, or file is >2GB, we MUST fallback to userbot
+        if not message or file_size_check > 2 * 1024**3:
+            if userbot:
+                try:
+                    message = await userbot.get_messages(chat_id, message_id)
+                except Exception as e:
+                    logger.error(f"Userbot failed to get message {message_id}: {e}")
+            
+        if not message or not message.media:
+            logger.error("Failed to retrieve message or message has no media.")
             await db.update_status(doc_id, "FAILED")
             return
             
-        if not message or not message.media:
-            await db.update_status(doc_id, "FAILED")
-            return
+        client = userbot if (file_size_check > 2 * 1024**3 or not file_size_check) else bot
             
         file = getattr(message, message.media.value)
         original_name = getattr(file, "file_name", "Unknown_File.mp4")
@@ -86,10 +99,10 @@ async def process_item(item):
         input_path = os.path.join(DOWNLOAD_DIR, f"in_{message_id}_{original_name}")
         
         start_time = time.time()
-        await client.download_media(
+        await fast_download(
             message,
-            file_name=input_path,
-            progress=progress_for_pyrogram,
+            output_path=input_path,
+            progress_cb=progress_for_pyrogram,
             progress_args=(f"📥 **Downloading:** `{original_name}`", status_msg, start_time, str(doc_id), cancel_markup)
         )
         

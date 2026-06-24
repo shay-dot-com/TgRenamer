@@ -47,6 +47,10 @@ if Config.STRING_SESSION:
 else:
     logger.info("No String Session provided. Operating in standard 2GB limit mode.")
 
+# Fast Downloader Pool (3 extra physical TCP connections)
+fast_clients = []
+FAST_CLIENT_COUNT = 3
+
 async def start_clients():
     logger.info("Starting Bot...")
     await bot.start()
@@ -54,6 +58,20 @@ async def start_clients():
     if userbot:
         logger.info("Starting Userbot...")
         await userbot.start()
+        
+    logger.info("Starting Fast Downloader Client Pool...")
+    for i in range(FAST_CLIENT_COUNT):
+        fc = Client(
+            f"fast_client_{i}",
+            api_id=Config.API_ID,
+            api_hash=Config.API_HASH,
+            bot_token=Config.BOT_TOKEN,
+            proxy=proxy_dict,
+            max_concurrent_transmissions=3,
+            sleep_threshold=60
+        )
+        await fc.start()
+        fast_clients.append(fc)
         
     logger.info("All clients started successfully!")
 
@@ -64,3 +82,7 @@ async def stop_clients():
     if userbot:
         logger.info("Stopping Userbot...")
         await userbot.stop()
+        
+    logger.info("Stopping Fast Downloader Client Pool...")
+    for fc in fast_clients:
+        await fc.stop()
