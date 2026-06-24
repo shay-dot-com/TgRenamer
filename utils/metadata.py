@@ -245,7 +245,7 @@ async def get_video_info(file_path: str, original_name: str = "", original_capti
                     if full_codec and full_codec not in info["audio_codecs"]:
                         info["audio_codecs"].append(full_codec)
                         
-                    tags = stream.get("tags", {})
+                    tags = {k.lower(): str(v) for k, v in stream.get("tags", {}).items()}
                     # Priority 1: ISO language tag mapped to full name
                     lang_raw = tags.get("language", "und").lower()
                     if lang_raw != "und":
@@ -264,12 +264,19 @@ async def get_video_info(file_path: str, original_name: str = "", original_capti
                         
                 elif c_type == "subtitle":
                     info["subs_count"] += 1
-                    tags = stream.get("tags", {})
+                    tags = {k.lower(): str(v) for k, v in stream.get("tags", {}).items()}
                     lang_raw = tags.get("language", "und").lower()
                     if lang_raw != "und":
                         mapped_lang = get_full_language_name(lang_raw)
                         if mapped_lang not in info["subs_languages"] and mapped_lang != "Unknown":
                             info["subs_languages"].append(mapped_lang)
+                    else:
+                        title = tags.get("title", "").lower()
+                        extracted = extract_languages_from_filename(title)
+                        for l in extracted:
+                            mapped_l = get_full_language_name(l)
+                            if mapped_l not in info["subs_languages"] and mapped_l != "Unknown":
+                                info["subs_languages"].append(mapped_l)
                     
             # Priority 2: Original Caption Language Parsing
             if info["audio_count"] >= 1 and not info["audio_languages"] and original_caption:
