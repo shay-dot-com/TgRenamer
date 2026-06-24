@@ -22,7 +22,7 @@ JUNK_TOKENS = {
     "10bit", "8bit", "hdr", "sdr", "hdr10", "dolby", "vision", "atmos"
 }
 
-async def search_tmdb(query: str, session: aiohttp.ClientSession) -> dict:
+async def search_tmdb(query: str, session: aiohttp.ClientSession, expected_year: str = "") -> dict:
     if not Config.TMDB_API_KEY or not query.strip():
         return None
         
