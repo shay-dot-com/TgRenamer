@@ -56,6 +56,12 @@ async def search_tmdb(query: str, session: aiohttp.ClientSession) -> dict:
                         # TMDB Hallucination Penalty: if TMDB returns a totally different string
                         confidence -= 40
                         
+                    # Heavily penalize short 1-word queries that are only partial matches
+                    # e.g. query "360" matching "Anderson Cooper 360"
+                    if len(query.split()) == 1 and len(query) <= 4:
+                        if query_lower != title_lower:
+                            confidence -= 40
+                            
                     # Boost by popularity (max +10)
                     confidence += min(popularity / 10, 10)
                     
@@ -106,7 +112,7 @@ def remove_channel_tags(text: str) -> str:
     text = re.sub(r'(?i)^channel\s*@[a-z0-9_]+[\s\._\-]*', '', text)
     
     # 2. Remove "@XYZ " or "@XYZ_" or "@XYZ."
-    text = re.sub(r'^@[a-z0-9_]+[\s\._\-]*', '', text)
+    text = re.sub(r'(?i)^@[a-z0-9_]+[\s\._\-]*', '', text)
     
     return text
 
