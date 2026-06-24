@@ -7,3 +7,4 @@ cryptography
 aiohttp
 aiohttp-socks
 TgCrypto==1.2.5
+aiofiles
