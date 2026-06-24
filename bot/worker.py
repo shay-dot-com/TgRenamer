@@ -85,13 +85,13 @@ async def process_item(item):
         info = await get_video_info(input_path, original_name, original_caption)
         
         # 3. Generate New Dynamic Name
-        new_name = await generate_new_name(original_name, info)
-        output_path = os.path.join(DOWNLOAD_DIR, new_name)
+        file_name, display_name = await generate_new_name(original_name, info)
+        output_path = os.path.join(DOWNLOAD_DIR, file_name)
         
         # 4. Process via FFmpeg
         if CANCEL_TASKS.get(str(doc_id)): raise asyncio.CancelledError()
         await status_msg.edit_text("🔨 Running FFmpeg...", reply_markup=cancel_markup)
-        success = await process_video(input_path, output_path, new_name)
+        success = await process_video(input_path, output_path, file_name)
         
         if not success:
             raise Exception("FFmpeg processing failed")
@@ -118,8 +118,8 @@ async def process_item(item):
             if not thumb_success or not os.path.exists(thumb_path):
                 thumb_path = None
 
-        # 5. Generate Caption
-        caption = generate_caption(new_name, info, original_size)
+        # 5. Generate Caption (using full display_name to preserve all tags visually)
+        caption = generate_caption(display_name, info, original_size)
         
         # 6. Upload
         if CANCEL_TASKS.get(str(doc_id)): raise asyncio.CancelledError()
@@ -131,9 +131,9 @@ async def process_item(item):
             document=output_path,
             thumb=thumb_path,
             caption=caption,
-            file_name=new_name,
+            file_name=file_name,
             progress=progress_for_pyrogram,
-            progress_args=(f"📤 **Uploading:** `{new_name}`", status_msg, upload_start_time, str(doc_id), cancel_markup)
+            progress_args=(f"📤 **Uploading:** `{file_name}`", status_msg, upload_start_time, str(doc_id), cancel_markup)
         )
         
         # Clean up
@@ -148,7 +148,7 @@ async def process_item(item):
         if str(doc_id) in CANCEL_TASKS:
             del CANCEL_TASKS[str(doc_id)]
             
-        logger.info(f"Successfully processed {new_name}")
+        logger.info(f"Successfully processed {file_name}")
         
     except asyncio.CancelledError:
         logger.warning(f"Process {doc_id} was cancelled by the user.")

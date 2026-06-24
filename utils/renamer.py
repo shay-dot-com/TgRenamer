@@ -1,9 +1,9 @@
 import re
 from utils.title_extractor import extract_title_from_filename
 
-async def generate_new_name(original_name: str, info: dict = None) -> str:
+async def generate_new_name(original_name: str, info: dict = None) -> tuple[str, str]:
     if not original_name:
-        return "Unknown_File"
+        return "Unknown_File", "Unknown_File"
 
     name = original_name
 
@@ -83,10 +83,27 @@ async def generate_new_name(original_name: str, info: dict = None) -> str:
                 # Replace space with dot to maintain standard formatting (AAC 2CH -> AAC.2CH)
                 tags.append(a_codec.replace(" ", "."))
             
-        if tags:
-            tag_str = ".".join(tags)
-            base_name = f"{base_name}.{tag_str}"
+        
+        # Build the full display name (for the caption)
+        full_tag_str = ".".join(tags)
+        display_name = f"{base_name}.{full_tag_str}" if full_tag_str else base_name
+        if ext: display_name = f"{display_name}.{ext}"
+        
+        # Build the actual file name (keep under 60 chars to prevent Telegram underscore bug)
+        current_tags = tags.copy()
+        while True:
+            tag_str = ".".join(current_tags)
+            test_name = f"{base_name}.{tag_str}" if tag_str else base_name
+            if ext: test_name = f"{test_name}.{ext}"
+            
+            if len(test_name) <= 60 or not current_tags:
+                file_name = test_name
+                break
+            
+            # Pop the least important tag from the end
+            current_tags.pop()
+            
+        return file_name, display_name
 
-    if ext:
-        return f"{base_name}.{ext}"
-    return base_name
+    display_name = f"{base_name}.{ext}" if ext else base_name
+    return display_name, display_name
