@@ -16,7 +16,7 @@ import time
 logger = logging.getLogger(__name__)
 
 # Config
-DOWNLOAD_DIR = "./downloads"
+DOWNLOAD_DIR = "/dev/shm/downloads" # RAM Disk for Oracle VPS Speed Boost
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 async def process_item(item):
