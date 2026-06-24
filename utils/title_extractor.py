@@ -34,6 +34,9 @@ async def search_tmdb(query: str, session: aiohttp.ClientSession, expected_year:
                 if data.get("results"):
                     best_match = data["results"][0]
                     
+                best_r = None
+                highest_conf = -1
+                
                 for r in data.get("results", []):
                     # Ignore people (actors/directors)
                     if r.get("media_type") not in ["movie", "tv"]:
@@ -67,14 +70,19 @@ async def search_tmdb(query: str, session: aiohttp.ClientSession, expected_year:
                         # Boost by popularity (max +10)
                         confidence += min(popularity / 10, 10)
                         
-                        return {
-                            "query": query,
-                            "title": title,
-                            "year": year,
-                            "confidence": confidence,
-                            "popularity": popularity,
-                            "media_type": r.get("media_type")
-                        }
+                        if confidence > highest_conf:
+                            highest_conf = confidence
+                            best_r = {
+                                "query": query,
+                                "title": title,
+                                "year": year,
+                                "confidence": confidence,
+                                "popularity": popularity,
+                                "media_type": r.get("media_type")
+                            }
+                            
+                if best_r:
+                    return best_r
     except Exception as e:
         logger.error(f"TMDB Search failed for {query}: {e}")
     return None
