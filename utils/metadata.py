@@ -74,7 +74,9 @@ def extract_languages_from_filename(filename: str) -> list:
     for code, full_name in _LANGUAGE_MAP.items():
         if full_name != "Unknown":
             lang_patterns[full_name.lower()] = full_name
-            lang_patterns[code.lower()] = full_name
+            # Exclude 2-letter codes to prevent domain names (.pl) and English stopwords (is, it, in, he) from matching
+            if len(code) > 2:
+                lang_patterns[code.lower()] = full_name
     
     scores = {v: 0 for v in set(lang_patterns.values())}
     filename_lower = filename.lower()
