@@ -69,8 +69,10 @@ async def generate_new_name(original_name: str, info: dict = None, custom_title:
             langs = [lang_map.get(l.lower(), l.title() if l.islower() else l) for l in info["audio_languages"]]
             if len(langs) > 2:
                 tags.append("Multi.Audio")
-            else:
-                tags.append(".".join(langs))
+            elif len(langs) == 2:
+                tags.append("Dual.Audio")
+            elif len(langs) == 1:
+                tags.append(langs[0])
             
         if info.get("video_codec") and info["video_codec"] != "Unknown":
             v_codec = info["video_codec"]
