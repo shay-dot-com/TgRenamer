@@ -60,13 +60,7 @@ async def generate_new_name(original_name: str, info: dict = None, custom_title:
             
         # Add primary languages
         if info.get("audio_languages"):
-            lang_map = {
-                "hin": "Hindi", "eng": "English", "tam": "Tamil", "tel": "Telugu",
-                "mal": "Malayalam", "kan": "Kannada", "spa": "Spanish", "fra": "French",
-                "jpn": "Japanese", "kor": "Korean", "chi": "Chinese", "en": "English",
-                "hi": "Hindi", "ta": "Tamil", "te": "Telugu", "ml": "Malayalam"
-            }
-            langs = [lang_map.get(l.lower(), l.title() if l.islower() else l) for l in info["audio_languages"]]
+            langs = info["audio_languages"]
             if len(langs) > 2:
                 tags.append("Multi.Audio")
             elif len(langs) == 2:
