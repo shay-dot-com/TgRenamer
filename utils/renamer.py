@@ -67,7 +67,10 @@ async def generate_new_name(original_name: str, info: dict = None, custom_title:
                 "hi": "Hindi", "ta": "Tamil", "te": "Telugu", "ml": "Malayalam"
             }
             langs = [lang_map.get(l.lower(), l.title() if l.islower() else l) for l in info["audio_languages"]]
-            tags.append(".".join(langs))
+            if len(langs) > 2:
+                tags.append("Multi.Audio")
+            else:
+                tags.append(".".join(langs))
             
         if info.get("video_codec") and info["video_codec"] != "Unknown":
             v_codec = info["video_codec"]

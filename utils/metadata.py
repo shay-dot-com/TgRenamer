@@ -261,15 +261,14 @@ async def get_video_info(file_path: str, original_name: str = "", original_capti
                         mapped_lang = get_full_language_name(lang_raw)
                         if mapped_lang not in info["audio_languages"] and mapped_lang != "Unknown":
                             info["audio_languages"].append(mapped_lang)
-                    else:
-                        # Priority 1.5: Stream Title check
-                        title = tags.get("title", "").lower()
-                        extracted = extract_languages_from_filename(title)
-                        for l in extracted:
-                            # Map extracted to ensure perfect casing
-                            mapped_l = get_full_language_name(l)
-                            if mapped_l not in info["audio_languages"] and mapped_l != "Unknown":
-                                info["audio_languages"].append(mapped_l)
+                            
+                    # Priority 1.5: Stream Title check ALWAYS
+                    title = tags.get("title", "").lower()
+                    extracted = extract_languages_from_filename(title)
+                    for l in extracted:
+                        mapped_l = get_full_language_name(l)
+                        if mapped_l not in info["audio_languages"] and mapped_l != "Unknown":
+                            info["audio_languages"].append(mapped_l)
                         
                 elif c_type == "subtitle":
                     info["subs_count"] += 1
@@ -279,16 +278,16 @@ async def get_video_info(file_path: str, original_name: str = "", original_capti
                         mapped_lang = get_full_language_name(lang_raw)
                         if mapped_lang not in info["subs_languages"] and mapped_lang != "Unknown":
                             info["subs_languages"].append(mapped_lang)
-                    else:
-                        title = tags.get("title", "").lower()
-                        extracted = extract_languages_from_filename(title)
-                        for l in extracted:
-                            mapped_l = get_full_language_name(l)
-                            if mapped_l not in info["subs_languages"] and mapped_l != "Unknown":
-                                info["subs_languages"].append(mapped_l)
+                            
+                    title = tags.get("title", "").lower()
+                    extracted = extract_languages_from_filename(title)
+                    for l in extracted:
+                        mapped_l = get_full_language_name(l)
+                        if mapped_l not in info["subs_languages"] and mapped_l != "Unknown":
+                            info["subs_languages"].append(mapped_l)
                                 
-            # Priority 1.7: MediaInfo Deep Track Parsing Fallback (For MKVs with missing ffprobe tags)
-            if (info["subs_count"] > 0 and not info["subs_languages"]) or (info["audio_count"] > 0 and not info["audio_languages"]):
+            # Priority 1.7: MediaInfo Deep Track Parsing Fallback
+            if (info["subs_count"] > len(info["subs_languages"])) or (info["audio_count"] > len(info["audio_languages"])):
                 logger.info("Falling back to MediaInfo for hidden MKV tracks...")
                 mi_data = await _run_mediainfo(file_path)
                 tracks = mi_data.get("media", {}).get("track", [])
@@ -296,18 +295,19 @@ async def get_video_info(file_path: str, original_name: str = "", original_capti
                     if not isinstance(track, dict): continue
                     t = (track.get("@type", "") or "").lower()
                     
-                    if t in ("text", "subtitle", "menu") and not info["subs_languages"]:
-                        lang = track.get("Language") or track.get("Language_String") or "und"
-                        if lang != "und":
-                            mapped_lang = get_full_language_name(lang)
-                            if mapped_lang not in info["subs_languages"] and mapped_lang != "Unknown":
+                    lang = track.get("Language") or "und"
+                    title = track.get("Title") or track.get("Language_String") or ""
+                    
+                    found_langs = []
+                    if lang != "und": found_langs.append(lang)
+                    if title: found_langs.extend(extract_languages_from_filename(title))
+                    
+                    for l in found_langs:
+                        mapped_lang = get_full_language_name(l)
+                        if mapped_lang != "Unknown":
+                            if t in ("text", "subtitle", "menu") and mapped_lang not in info["subs_languages"]:
                                 info["subs_languages"].append(mapped_lang)
-                                
-                    elif t == "audio" and not info["audio_languages"]:
-                        lang = track.get("Language") or track.get("Language_String") or "und"
-                        if lang != "und":
-                            mapped_lang = get_full_language_name(lang)
-                            if mapped_lang not in info["audio_languages"] and mapped_lang != "Unknown":
+                            elif t == "audio" and mapped_lang not in info["audio_languages"]:
                                 info["audio_languages"].append(mapped_lang)
                     
             # Priority 2: Original Caption Language Parsing
